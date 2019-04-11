@@ -5,6 +5,7 @@ class Data_Migration extends Plugin {
 
 	function init($host) {
 		$host->add_command("data-user", "set username for import/export", $this, ":", "USER");
+		$host->add_command("data-only-marked", "only export starred (or archived) articles", $this, "", "");
 		$host->add_command("data-import", "import articles", $this, ":", "FILE.zip");
 		$host->add_command("data-export", "export articles", $this, ":", "FILE.zip");
 	}
@@ -15,6 +16,10 @@ class Data_Migration extends Plugin {
 			"fox",
 			true,
 			"https://git.tt-rss.org/fox/ttrss-data-migration/wiki");
+	}
+
+	function data_only_marked($args) {
+		//
 	}
 
 	function data_user($args) {
@@ -92,6 +97,7 @@ class Data_Migration extends Plugin {
 	function data_export($args) {
 		$user = $args["data_user"];
 		$output_file = $args["data_export"];
+		$only_marked = isset($args["data_only_marked"]);
 
 		if (!$user) {
 			Debug::log("error: please set username using --data_user");
@@ -105,6 +111,9 @@ class Data_Migration extends Plugin {
 			$owner_uid = $row['id'];
 
 			Debug::log("exporting articles of user $user to $output_file...");
+
+			if ($only_marked)
+				Debug::log("limiting export to marked and archived articles.");
 
 			if (file_exists($output_file)) {
 				Debug::log("refusing to overwrite existing output file.");
@@ -129,7 +138,7 @@ class Data_Migration extends Plugin {
 				$batch = [
 					"version" => $this->DATA_FORMAT_VERSION,
 					"schema-version" => SCHEMA_VERSION,
-					"articles" => $this->get_export_batch($owner_uid, $offset, $batch_size)
+					"articles" => $this->get_export_batch($owner_uid, $offset, $batch_size, $only_marked)
 				];
 
 				$offset += count($batch["articles"]);
@@ -152,12 +161,15 @@ class Data_Migration extends Plugin {
 		}
 	}
 	
-	private function get_export_batch($owner_uid, $offset, $batch_size)	{
+	private function get_export_batch($owner_uid, $offset, $batch_size, $only_marked)	{
 		$rv = [];
 
 		Debug::log("processing articles, offset: $offset");
 
-		// (marked = true OR feed_id IS NULL) AND
+		if ($only_marked)
+			$export_filter_qpart = "(marked = true OR feed_id IS NULL) AND";
+		else
+			$export_filter_qpart = "";
 
 		$sth = $this->pdo->prepare("SELECT
 					ttrss_entries.guid,
@@ -177,6 +189,7 @@ class Data_Migration extends Plugin {
 					ttrss_user_entries LEFT JOIN ttrss_feeds ON (ttrss_feeds.id = feed_id),
 					ttrss_entries
 				WHERE
+				    $export_filter_qpart
 					ref_id = ttrss_entries.id AND
 					ttrss_user_entries.owner_uid = ?
 				ORDER BY ttrss_entries.id LIMIT $batch_size OFFSET $offset");
