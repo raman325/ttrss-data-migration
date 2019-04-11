@@ -11,7 +11,7 @@ class Data_Migration extends Plugin {
 
 	function about() {
 		return array(1.0,
-			"Migrate user articles using neutral format (JSON)",
+			"Migrates user articles using neutral format",
 			"fox",
 			true,
 			"https://git.tt-rss.org/fox/ttrss-data-migration/wiki");
