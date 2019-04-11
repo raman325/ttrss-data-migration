@@ -215,12 +215,7 @@ class Data_Migration extends Plugin {
 			} else {
 				$sth = $this->pdo->prepare(
 					"INSERT INTO ttrss_entries
-									(title,
-									guid,
-									link,
-									updated,
-									content,
-									content_hash,
+									(title, guid, link, updated, content, content_hash,
 									no_orig_date,
 									date_updated,
 									date_entered,
