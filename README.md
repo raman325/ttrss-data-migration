@@ -9,4 +9,4 @@ to transfer articles between different database types (i.e. MySQL to PostgreSQL)
 2. Enable in ``PLUGINS`` directive of ``config.php``
 3. Plugin is invoked using command line: ``php ./update.php --help``
 
-See the [wiki](/fox/ttrss-data-migration/wiki) for more information.
+See the [wiki](https://git.tt-rss.org/fox/ttrss-data-migration/wiki) for more information.
