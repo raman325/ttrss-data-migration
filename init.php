@@ -110,6 +110,9 @@ class Data_Migration extends Plugin {
 		if ($row = $sth->fetch()) {
 			$owner_uid = $row['id'];
 
+			if (stripos($output_file, ".zip") === FALSE)
+				$output_file = $output_file . ".zip";
+
 			Debug::log("exporting articles of user $user to $output_file...");
 
 			if ($only_marked)
@@ -151,7 +154,10 @@ class Data_Migration extends Plugin {
 					break;
 			}
 
-			$zip->close();
+			if ($zip->close() !== TRUE) {
+				Debug::log("write error while saving data to $output_file");
+				exit(3);
+			}
 
 			Debug::log("exported $total_processed articles to $output_file.");
 
