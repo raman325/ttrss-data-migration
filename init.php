@@ -188,6 +188,7 @@ class Data_Migration extends Plugin {
 					link,
 					tag_cache,
 					label_cache,
+					author,
 					ttrss_feeds.title AS feed_title,
 					ttrss_feeds.feed_url AS feed_url,
 					ttrss_entries.updated
@@ -248,7 +249,7 @@ class Data_Migration extends Plugin {
 									NOW(),
 									'',
 									'0',
-									'')");
+									:author)");
 
 				$sth->execute([
 					"title" => $article['title'],
@@ -256,7 +257,8 @@ class Data_Migration extends Plugin {
 					"link" => $article['link'],
 					"updated" => $article['updated'],
 					"content" => $article['content'],
-					"content_hash" => sha1($article['content'])
+					"content_hash" => sha1($article['content']),
+					"author" => $article["author"]
 				]);
 
 				$sth = $this->pdo->prepare("SELECT id FROM ttrss_entries WHERE guid = ?");
