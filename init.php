@@ -1,21 +1,20 @@
 <?php
-class Data_Migration extends Plugin {
-
+class Data_Migration_Alt extends Plugin {
 	private $DATA_FORMAT_VERSION = 1;
 
 	function init($host) {
 		$host->add_command("data-user", "set username for import/export", $this, ":", "USER");
 		$host->add_command("data-only-marked", "only export starred (or archived) articles", $this, "", "");
-		$host->add_command("data-import", "import articles", $this, ":", "FILE.zip");
-		$host->add_command("data-export", "export articles", $this, ":", "FILE.zip");
+		$host->add_command("data-import", "import articles", $this, ":", "path/to/import/to");
+		$host->add_command("data-export", "export articles", $this, ":", "path/to/export/to");
 	}
 
 	function about() {
 		return array(1.0,
 			"Migrates user articles using neutral format",
-			"fox",
+			"raman325",
 			true,
-			"https://git.tt-rss.org/fox/ttrss-data-migration/wiki");
+			"https://github.com/raman325/ttrss-data-migration-alt");
 	}
 
 	function data_only_marked($args) {
@@ -43,48 +42,47 @@ class Data_Migration extends Plugin {
 
 			Debug::log("importing articles of user $user from $input_file...");
 
-			$zip = new ZipArchive();
-
-			if ($zip->open($input_file) !== TRUE) {
-				Debug::log("unable to open $input_file");
-				exit(3);
+			if (!file_exists($input_file)) {
+				Debug::log("folder doesn't exist, exiting");
+				exit(2);
 			}
 
 			$total_imported = 0;
 			$total_processed = 0;
 			$total_feeds_created = 0;
 
-			for ($i = 0; $i < $zip->numFiles; $i++) {
-				Debug::log("processing " . $zip->getNameIndex($i));
-
-				$batch = json_decode($zip->getFromIndex($i), true);
-
-				if ($batch) {
-					if ($batch["version"] == $this->DATA_FORMAT_VERSION) {
-						if ($batch["schema-version"] == SCHEMA_VERSION) {
-							$total_processed += count($batch["articles"]);
-
-							list ($batch_imported, $batch_feeds_created) = $this->import_article_batch($owner_uid, $batch["articles"]);
-
-							$total_imported += $batch_imported;
-							$total_feeds_created += $batch_feeds_created;
-
+			foreach (new DirectoryIterator($input_file) as $fileInfo) {
+				if ($fileInfo->getType() === "file" && $fileInfo->getExtension() === "json") {
+					$filename = $fileInfo->getFilename();
+					Debug::log("processing " . $filename);
+					
+					$batch = json_decode(file_get_contents($fileInfo->getPathname()), true);
+					
+					if ($batch) {
+						if ($batch["version"] == $this->DATA_FORMAT_VERSION) {
+							if ($batch["schema-version"] == SCHEMA_VERSION) {
+								$total_processed += count($batch["articles"]);
+	
+								list ($batch_imported, $batch_feeds_created) = $this->import_article_batch($owner_uid, $batch["articles"]);
+	
+								$total_imported += $batch_imported;
+								$total_feeds_created += $batch_feeds_created;
+	
+							} else {
+								Debug::log("batch has incorrect schema format version (expected: " .
+									SCHEMA_VERSION . ", got: " . $batch["schema-version"]);
+							}
 						} else {
-							Debug::log("batch has incorrect schema format version (expected: " .
-								SCHEMA_VERSION . ", got: " . $batch["schema-version"]);
+							Debug::log("batch has incorrect data format version (expected: " .
+								$this->DATA_FORMAT_VERSION . ", got: " . $batch["version"]);
 						}
+	
+	
 					} else {
-						Debug::log("batch has incorrect data format version (expected: " .
-							$this->DATA_FORMAT_VERSION . ", got: " . $batch["version"]);
+						Debug::log("error while decoding JSON data.");
 					}
-
-
-				} else {
-					Debug::log("error while decoding JSON data.");
 				}
 			}
-
-			$zip->close();
 
 			Debug::log("imported $total_imported (out of $total_processed) articles, created $total_feeds_created feeds.");
 
@@ -110,24 +108,21 @@ class Data_Migration extends Plugin {
 		if ($row = $sth->fetch()) {
 			$owner_uid = $row['id'];
 
-			if (stripos($output_file, ".zip") === FALSE)
-				$output_file = $output_file . ".zip";
+			if (substr($output_file, -1) !== "/")
+				$output_file = $output_file . "/";
 
 			Debug::log("exporting articles of user $user to $output_file...");
 
 			if ($only_marked)
 				Debug::log("limiting export to marked and archived articles.");
 
-			if (file_exists($output_file)) {
-				Debug::log("refusing to overwrite existing output file.");
-				exit(2);
-			}
-
-			$zip = new ZipArchive();
-
-			if ($zip->open($output_file, ZipArchive::CREATE) !== TRUE) {
-				Debug::log("unable to create $output_file");
-				exit(3);
+			if (!file_exists($output_file)) {
+				Debug::log("folder doesn't exist, creating it.");
+				mkdir($output_file, 0777, true);
+				if (!file_exists($output_file)) {
+					Debug::log("couldn't create folder.");
+					exit(2);
+				}
 			}
 
 			$offset = 0;
@@ -136,7 +131,7 @@ class Data_Migration extends Plugin {
 			$total_processed = 0;
 
 			while (true) {
-				$batch_filename = sprintf("%08d.json", $batch_seq);
+				$batch_filename = sprintf("%s%08d.json", $output_file, $batch_seq);
 
 				$batch = [
 					"version" => $this->DATA_FORMAT_VERSION,
@@ -148,15 +143,10 @@ class Data_Migration extends Plugin {
 				$total_processed += count($batch["articles"]);
 				++$batch_seq;
 
-				$zip->addFromString($batch_filename, json_encode($batch, false));
+				file_put_contents($batch_filename, json_encode($batch, false));
 
 				if (count($batch["articles"]) != $batch_size)
 					break;
-			}
-
-			if ($zip->close() !== TRUE) {
-				Debug::log("write error while saving data to $output_file");
-				exit(3);
 			}
 
 			Debug::log("exported $total_processed articles to $output_file.");
