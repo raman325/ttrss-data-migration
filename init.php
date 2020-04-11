@@ -179,6 +179,7 @@ class Data_Migration_Alt extends Plugin {
 					tag_cache,
 					label_cache,
 					author,
+					unread,
 					ttrss_feeds.title AS feed_title,
 					ttrss_feeds.feed_url AS feed_url,
 					ttrss_entries.updated
@@ -320,7 +321,7 @@ class Data_Migration_Alt extends Plugin {
 						"INSERT INTO ttrss_user_entries
 									(ref_id, owner_uid, feed_id, unread, last_read, 
 									 	marked, published, score, tag_cache, label_cache, uuid, note)
-									VALUES (:ref_id, :owner_uid, :feed_id, false, NULL, 
+									VALUES (:ref_id, :owner_uid, :feed_id, :unread, NULL,
 									    :marked, :published, :score, :tag_cache, '', '', :note)");
 
 					$res = $sth->execute([
@@ -329,6 +330,7 @@ class Data_Migration_Alt extends Plugin {
 						"feed_id" => $feed,
 						"marked" => (int)sql_bool_to_bool($article['marked']),
 						"published" => (int)sql_bool_to_bool($article['published']),
+						"unread" => (int)sql_bool_to_bool($article['unread']),
 						"score" => $score,
 						"tag_cache" => $tag_cache,
 						"note" => $note]);
